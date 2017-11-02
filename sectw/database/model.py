@@ -25,6 +25,25 @@ class ORMEncoder(JSONEncoder):
         return d
 
 
+def hook(dict):
+    if dict.get('counties'):
+        version = Version()
+        version.__dict__.update(dict)
+        return version
+    if dict.get('towns'):
+        county = County()
+        county.__dict__.update(dict)
+        return county
+    if dict.get('sections'):
+        town = Town()
+        town.__dict__.update(dict)
+        return town
+    else:
+        section = Section()
+        section.__dict__.update(dict)
+        return section
+
+
 class Version(Base):
     __tablename__ = 'version'
     id = Column(Integer, Sequence('version_id_seq'), primary_key=True, nullable=False)
@@ -34,12 +53,6 @@ class Version(Base):
     @staticmethod
     def get_latest_version(session):
         return session.query(Version).order_by(Version.date.desc()).first()
-
-    @classmethod
-    def from_dict(cls, dict):
-        obj = cls()
-        obj.__dict__.update(dict)
-        return obj
 
     def find(self, county_str):
         pattern = regex.compile('('+county_str+'){e<=0}')
@@ -65,7 +78,7 @@ class County(Base):
     towns = relationship('Town')
 
     def find(self, town_str):
-        pattern = regex.compile('('+town_str+'){e<=1}')
+        pattern = regex.compile('('+town_str+'){e<=0}')
         return [town for town in self.towns if pattern.match(town.name)]
 
 
@@ -79,7 +92,7 @@ class Town(Base):
     sections = relationship('Section')
 
     def find(self, section_str):
-        pattern = regex.compile('('+section_str+'){e<=2}')
+        pattern = regex.compile('('+section_str+'){e<=0}')
         return [section for section in self.sections if pattern.match(section.name)]
 
 

@@ -6,7 +6,7 @@ from __future__ import unicode_literals
 import re
 import json
 import six
-from .database.model import Version
+from .database.model import hook
 
 
 class Address(object):
@@ -108,8 +108,8 @@ class LandCode(Address):
     SECTION_MATCH = ['段', '地段']
     NUMBER_MATCH = ['號', '地號']
 
-    def __init__(self, land_str):
-        Address.__init__(self, land_str)
+    def __init__(self, address_str):
+        Address.__init__(self, address_str)
         self.county, self.town, self.section, self.number = LandCode.get_value(self.tokens)
 
     @staticmethod
@@ -141,13 +141,11 @@ class Directory(object):
     @staticmethod
     def load_csv(csv_path):
         with open(csv_path, 'rb') as file:
-            return json.load(file, object_hook=Version.from_dict)
+            return json.load(file, object_hook=hook)
 
     def find(self, addr_str):
 
         land_code = LandCode(addr_str)
-
-        print(land_code.county, land_code.town, land_code.section, land_code.number)
 
         if land_code.county:
             counties = self.version.find(land_code.county)
@@ -169,9 +167,7 @@ class Directory(object):
                 sections += town.find(land_code.section)
         else:
             for town in towns:
-                sections += town.lands
-
-        print(len(counties), len(towns), len(sections))
+                sections += town.sections
 
         return sections
 

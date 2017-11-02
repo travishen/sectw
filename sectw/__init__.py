@@ -6,7 +6,7 @@ from .util import Directory
 
 # paths
 _package_root = dirname(__file__)
-_csv_version = '2017-10-31'
+_csv_version = '2017-11-02'
 _csv_path = join(_package_root, '{}.csv'.format(_csv_version))
 
 # create a instance
