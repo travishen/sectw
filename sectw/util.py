@@ -6,6 +6,7 @@ from __future__ import unicode_literals
 import re
 import json
 import six
+import regex
 from .database.model import hook
 
 
@@ -148,28 +149,23 @@ class Directory(object):
         land_code = LandCode(addr_str)
 
         if land_code.county:
-            counties = self.version.find(land_code.county)
+            counties = [c for c in self.version.counties if regex.match(r'(?b)('+land_code.county+'){i<=1}', c.name)]
         else:
             counties = self.version.counties
 
         towns = []
+        for county in counties:
+            towns += county.towns
         if land_code.town:
-            for county in counties:
-                print(county)
-                towns += county.find(land_code.town)
-        else:
-            for county in counties:
-                towns += county.towns
+            towns = [t for t in towns if regex.match(r'(?b)(?:'+land_code.town+'){i<=1}', t.name)]
 
         sections = []
+        for town in towns:
+            sections += town.sections
         if land_code.section:
-            for town in towns:
-                sections += town.find(land_code.section)
-        else:
-            for town in towns:
-                sections += town.sections
+            sections = [s for s in sections if regex.match(r'(?b)('+land_code.section+'){s<=1,d<=3,i<=3,i+3d+3s<4}', s.name)]
 
-        return sections
+        return [s.name + ' ' for s in sections]
 
 
 

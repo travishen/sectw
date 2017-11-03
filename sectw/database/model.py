@@ -54,10 +54,6 @@ class Version(Base):
     def get_latest_version(session):
         return session.query(Version).order_by(Version.date.desc()).first()
 
-    def find(self, county_str):
-        pattern = regex.compile('('+county_str+'){e<=0}')
-        return [county for county in self.counties if pattern.match(county.name)]
-
     @staticmethod
     def get_version(session, date):
         data = session.query(Version) \
@@ -77,10 +73,6 @@ class County(Base):
     version = relationship('Version', back_populates='counties')
     towns = relationship('Town')
 
-    def find(self, town_str):
-        pattern = regex.compile('('+town_str+'){e<=0}')
-        return [town for town in self.towns if pattern.match(town.name)]
-
 
 class Town(Base):
     __tablename__ = 'town'
@@ -90,10 +82,6 @@ class Town(Base):
     county_id = Column(Integer, ForeignKey('county.id'))
     county = relationship('County', back_populates='towns')
     sections = relationship('Section')
-
-    def find(self, section_str):
-        pattern = regex.compile('('+section_str+'){e<=0}')
-        return [section for section in self.sections if pattern.match(section.name)]
 
 
 class Section(Base):
