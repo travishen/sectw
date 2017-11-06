@@ -1,20 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Address function modificated from mosky's zipcodetw module
+# Address function modified from mosky's zipcodetw module
 from __future__ import print_function
 from __future__ import unicode_literals
 import re
 import json
 import six
-import regex
 from .database.model import hook
 
 
 class Address(object):
     TOKEN_RE = re.compile('''
         (?:
-            (?P<no>\d+)
-            |
             (?P<value>.+?)
         )
         (?:
@@ -22,9 +19,8 @@ class Address(object):
         )
     ''', re.X)
 
-    NO = 0
-    VALUE = 1
-    UNIT = 2
+    VALUE = 0
+    UNIT = 1
 
     TO_REPLACE_RE = re.compile('''
         [ 　，台、；.之]
@@ -124,7 +120,7 @@ class LandCode(Address):
         section = LandCode.get_first_value([token[Address.VALUE] + token[Address.UNIT]
                                            for token in tokens if token[Address.UNIT] in LandCode.SECTION_MATCH])
 
-        number = LandCode.get_first_value([token[Address.VALUE] + token[Address.UNIT]
+        number = LandCode.get_first_value([token[Address.VALUE]
                                            for token in tokens if token[Address.UNIT] in LandCode.NUMBER_MATCH])
 
         return county, town, section, number
@@ -144,28 +140,58 @@ class Directory(object):
         with open(csv_path, 'rb') as file:
             return json.load(file, object_hook=hook)
 
-    def find(self, addr_str):
+    def find(self, addr_str, take=1):
 
         land_code = LandCode(addr_str)
 
         if land_code.county:
-            counties = [c for c in self.version.counties if regex.match(r'(?b)('+land_code.county+'){i<=1}', c.name)]
+            counties = self.version.find(land_code.county)
         else:
             counties = self.version.counties
 
         towns = []
         for county in counties:
-            towns += county.towns
-        if land_code.town:
-            towns = [t for t in towns if regex.match(r'(?b)(?:'+land_code.town+'){i<=1}', t.name)]
+            if land_code.town:
+                towns += county.find(land_code.town)
+            else:
+                towns += county.towns
 
         sections = []
         for town in towns:
-            sections += town.sections
-        if land_code.section:
-            sections = [s for s in sections if regex.match(r'(?b)('+land_code.section+'){s<=1,d<=3,i<=3,i+3d+3s<4}', s.name)]
+            if land_code.section:
+                sections += town.find(land_code.section)
 
-        return [s.name + ' ' for s in sections]
+        sections.sort(key=lambda x: sum(x.fuzzy_count))
+
+        number = None
+        if land_code.number:
+            numbers = land_code.number.split('-')
+            if len(numbers) == 1:
+                numbers.append('')
+            number = numbers[0].zfill(4) + numbers[1].zfill(4)
+
+        return json.dumps([section.__repr__(number) for section in sections[:take] if section.validate_fuzzy()])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
