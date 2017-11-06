@@ -146,11 +146,14 @@ class Directory(object):
         with open(csv_path, 'rb') as file:
             return json.load(file, object_hook=hook)
 
-    def load_db(self, db_path, date):
+    def load_db(self, db_path, create_date=None):
         try:
             config.setup_session(db_path)
             with config.session_scope() as session:
-                self.version = Version.get_version(session, date)
+                if not create_date:
+                    latest_version = Version.get_latest_version(session)
+                    create_date = latest_version.date
+                self.version = Version.get_version(session, create_date)
         except:
             logging.exception('message')
 
