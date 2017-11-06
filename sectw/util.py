@@ -17,7 +17,7 @@ class Address(object):
             (?P<value>.+?)
         )
         (?:
-            (?P<unit>[縣市鄉鎮市區段號]|地號|地段)
+            (?P<unit>[縣市鄉鎮市區段號]|地號|地段|小段)
         )
     ''', re.X)
 
@@ -32,7 +32,7 @@ class Address(object):
         [一二三四五六七八九]?
         十?
         [一二三四五六七八九]
-        (?=[號]|地號|地段)
+        (?=[號]|地號)
     ''', re.X)
 
     DELIMITER = ','
@@ -105,11 +105,12 @@ class LandCode(Address):
     COUNTY_MATCH = ['縣', '市']
     TOWN_MATCH = ['鄉', '鎮', '區']
     SECTION_MATCH = ['段', '地段']
+    SMALL_SECTION_MATCH = ['小段']
     NUMBER_MATCH = ['號', '地號']
 
     def __init__(self, address_str):
         Address.__init__(self, address_str)
-        self.county, self.town, self.section, self.number = LandCode.get_value(self.tokens)
+        self.county, self.town, self.section, self.small_section, self.number = LandCode.get_value(self.tokens)
 
     @staticmethod
     def get_value(tokens):
@@ -122,14 +123,17 @@ class LandCode(Address):
         section = LandCode.get_first_value([token[Address.VALUE] + token[Address.UNIT]
                                            for token in tokens if token[Address.UNIT] in LandCode.SECTION_MATCH])
 
+        small_section = LandCode.get_first_value([token[Address.VALUE] + token[Address.UNIT]
+                                             for token in tokens if token[Address.UNIT] in LandCode.SMALL_SECTION_MATCH])
+
         number = LandCode.get_first_value([token[Address.VALUE]
                                            for token in tokens if token[Address.UNIT] in LandCode.NUMBER_MATCH])
 
-        return county, town, section, number
+        return county, town, section, small_section, number
 
     @staticmethod
     def get_first_value(lst):
-        return next(iter(lst or []), None)
+        return next(iter(lst or []), '')
 
 
 class Directory(object):
@@ -160,27 +164,42 @@ class Directory(object):
             counties = self.version.counties
 
         towns = []
-        for county in counties:
-            if land_code.town:
+        if land_code.town:
+            for county in counties:
                 towns += county.find(land_code.town)
-            else:
+        else:
+            for county in counties:
                 towns += county.towns
 
         sections = []
-        for town in towns:
-            if land_code.section:
-                sections += town.find(land_code.section)
+        if land_code.section:
+            for town in towns:
+                for section in town.sections:
+                    section.count_section_fuzzy(land_code.section)
+                    if land_code.small_section:
+                        section.count_small_section_fuzzy(land_code.small_section)
+                    sections.append(section)
+            sections.sort(key=lambda x: sum(x.section_fc))
+            if land_code.small_section:
+                sections.sort(key=lambda x: sum(x.small_section_fc))
+        elif land_code.small_section:
+            for town in towns:
+                for section in town.sections:
+                    section.count_small_section_fuzzy(land_code.small_section)
+                    sections.append(section)
+            sections.sort(key=lambda x: sum(x.small_section_fc))
 
-        sections.sort(key=lambda x: sum(x.fuzzy_count))
-
-        number = None
+        number = ''
         if land_code.number:
             numbers = land_code.number.split('-')
             if len(numbers) == 1:
                 numbers.append('')
             number = numbers[0].zfill(4) + numbers[1].zfill(4)
 
-        return json.dumps([section.__repr__(number) for section in sections[:take] if section.validate_fuzzy()])
+        for section in sections[:take]:
+            print(section.section_name + section.small_section_name)
+
+        return json.dumps([section.__repr__(number) for section in sections[:take]])
 
 
 

@@ -4,6 +4,7 @@ from __future__ import print_function
 import requests
 import datetime
 from xml.etree import ElementTree
+from .util import LandCode
 from .database.model import Version, County, Town, Section
 
 
@@ -58,10 +59,16 @@ def list_section(county_code, town_code):
         for child in tree.iterfind('sectItem'):
             code = child.findtext('sectcode')
             name = child.findtext('sectstr')
+            land_code = LandCode(name)
             office = child.findtext('office')
             code6 = office + code
             code7 = town_code + code
-            section = Section(code=code, name=name, office=office, code6=code6, code7=code7)
+            section = Section(code=code,
+                              section_name=land_code.section,
+                              small_section_name=land_code.small_section,
+                              office=office,
+                              code6=code6,
+                              code7=code7)
             sections.append(section)
     except:
         print('please verify this url:{}'.format(url))
