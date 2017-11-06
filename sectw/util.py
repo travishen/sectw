@@ -199,9 +199,6 @@ class Directory(object):
                 numbers.append('')
             number = numbers[0].zfill(4) + numbers[1].zfill(4)
 
-        for section in sections[:take]:
-            print(section.section_name + section.small_section_name)
-
         return json.dumps([section.__repr__(number) for section in sections[:take]])
 
 
