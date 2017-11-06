@@ -8,9 +8,9 @@ from . import Base, Session
 engine = None
 
 
-def setup_session(dburl):
+def setup_session(dbpath):
     global engine
-    engine = create_engine(dburl)
+    engine = create_engine(dbpath)
     Session.configure(bind=engine)
 
 

@@ -4,7 +4,7 @@ from __future__ import print_function
 import sys
 import logging
 import argparse
-from . import api
+from . import api, _package_root
 from .database import model, config
 import json
 import datetime
@@ -15,7 +15,7 @@ def build():
         version = api.collect()
         data = json.dumps(version, cls=model.ORMEncoder)
         csv_version = version.date
-        with open('{}.csv'.format(csv_version), 'w') as file:
+        with open('sectw\{}.csv'.format(csv_version), 'w') as file:
             file.write(data)
         print('Version added to folder. If you want to use newer version, please edit __init__.py in the package.')
     except:
@@ -43,18 +43,18 @@ def build_cmd(db_path=None, setup=False):
 
 def parse_args(args):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dburl', help='sql connection here.')
+    parser.add_argument('--dbpath', help='sql connection here.')
     parser.add_argument('--setup', help='present to initialize database', action='store_true')
     return parser.parse_args()
 
 
-def main(args):
-    args = parse_args(args)
-    if args.dburl:
-        build_cmd(args.dburl, args.setup)
+def main(args=None):
+    if args:
+        args = parse_args(args)
+        build_cmd(args.dbpath, args.setup)
     else:
         build()
 
 
 if __name__ == '__main__':
-    main(*sys.argv[1:])
+    main(sys.argv[1:])

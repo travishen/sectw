@@ -6,7 +6,9 @@ from __future__ import unicode_literals
 import re
 import json
 import six
-from .database.model import hook
+import logging
+from .database.model import hook, Version
+from .database import config
 
 
 class Address(object):
@@ -139,6 +141,14 @@ class Directory(object):
     def load_csv(csv_path):
         with open(csv_path, 'rb') as file:
             return json.load(file, object_hook=hook)
+
+    def load_db(self, db_path, date):
+        try:
+            config.setup_session(db_path)
+            with config.session_scope() as session:
+                self.version = Version.get_version(session, date)
+        except:
+            logging.exception('message')
 
     def find(self, addr_str, take=1):
 

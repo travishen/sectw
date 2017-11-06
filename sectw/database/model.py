@@ -56,12 +56,11 @@ class Version(Base):
 
     @staticmethod
     def get_version(session, date):
-        data = session.query(Version) \
-            .filter(Version.date == date) \
-            .option(subqueryload(Version.counties)
-                    .subqueryload(County.towns)
-                    .subqueryload(Town.sections))
-        return data
+        version = session.query(Version).filter(Version.date == date)\
+            .options(subqueryload(Version.counties).subqueryload(County.towns).subqueryload(Town.sections)).first()
+        # remove all object instance from this Session
+        session.expunge_all()
+        return version
 
     def find(self, county_str):
         return [county for county in self.counties if regex.match(r'(?b)('+county_str+'){i<=1}', county.name)]
@@ -92,6 +91,7 @@ class Town(Base):
     def find(self, section_str):
         return [section.count_fuzzy(section_str) for section in self.sections]
 
+
 class Section(Base):
     __tablename__ = 'section'
     id = Column(Integer, Sequence('section_id_seq'), primary_key=True, nullable=False)
@@ -102,9 +102,6 @@ class Section(Base):
     code7 = Column(String(7))
     town_id = Column(Integer, ForeignKey('town.id'))
     town = relationship('Town', back_populates='sections')
-
-    def __init__(self):
-        self.fuzzy_count = None
 
     def count_fuzzy(self, section_str):
         self.fuzzy_count = regex.fullmatch(r'(?e)('+section_str+'){e}', self.name).fuzzy_counts

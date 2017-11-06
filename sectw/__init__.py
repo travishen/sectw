@@ -14,3 +14,4 @@ _dir = Directory(_csv_path)
 
 # expose function
 find = _dir.find
+load_db = _dir.load_db
