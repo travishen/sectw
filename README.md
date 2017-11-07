@@ -27,11 +27,11 @@ If you want to create database
 
 Setup database(e.g. postgresql):
 
-    $ python -m sextw.builder --dbpath postgresql+psycopg2://username:password@host/dbname --setup
+    $ python -m sectw.builder --dbpath postgresql+psycopg2://username:password@host/dbname --setup
 
 Build a new version:
 
-    $ python -m sextw.builder --dbpath postgresql+psycopg2://username:password@host/dbname
+    $ python -m sectw.builder --dbpath postgresql+psycopg2://username:password@host/dbname
 
 Load from database
 
