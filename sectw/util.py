@@ -14,10 +14,19 @@ from .database import config
 class Address(object):
     TOKEN_RE = re.compile('''
         (?:
+            (?P<value>..+?)
+        )
+        (?:
+            (?P<unit>[縣市鄉鎮市區段]|地段)
+        )
+    ''', re.X)
+
+    S_TOKEN_RE = re.compile('''
+        (?:
             (?P<value>.+?)
         )
         (?:
-            (?P<unit>[縣市鄉鎮市區段號]|地號|地段|小段)
+            (?P<unit>號|地號|小段)
         )
     ''', re.X)
 
@@ -35,11 +44,8 @@ class Address(object):
         (?=[號]|地號)
     ''', re.X)
 
-    DELIMITER = ','
-
     # the strs matched but not in here will be removed
     TO_REPLACE_MAP = {
-        '.': DELIMITER, '，': DELIMITER, '、': DELIMITER, '；': DELIMITER,
         '之': '-', '台': '臺',
         '１': '1', '２': '2', '３': '3', '４': '4', '５': '5',
         '６': '6', '７': '7', '８': '8', '９': '9', '０': '0',
@@ -78,7 +84,16 @@ class Address(object):
 
     @staticmethod
     def tokenize(addr_str):
-        return Address.TOKEN_RE.findall(Address.normalize(addr_str))
+        addr_str = Address.normalize(addr_str)
+        # split 松山區西松段一小段 to ['松山區西松段', '一小段'] and fit to different pattern
+        addr_list = list(filter(None, re.split('(段)', addr_str, 1)))
+        addr_list[:2] = [''.join(addr_list[:2])]
+        tokens = []
+        if len(addr_list) > 0:
+            tokens += Address.TOKEN_RE.findall(Address.normalize(addr_list[0]))
+        if len(addr_list) > 1:
+            tokens += Address.S_TOKEN_RE.findall(Address.normalize(addr_list[1]))
+        return tokens
 
     def __init__(self, addr_str):
         self.tokens = Address.tokenize(addr_str)
@@ -174,6 +189,9 @@ class Directory(object):
             for county in counties:
                 towns += county.towns
 
+        # state the costs of each type of error for fuzzy_counts sorting
+        FUZZY_MATCH_COSTS = (3, 1, 1)
+
         sections = []
         if land_code.section:
             for town in towns:
@@ -182,15 +200,15 @@ class Directory(object):
                     if land_code.small_section:
                         section.count_small_section_fuzzy(land_code.small_section)
                     sections.append(section)
-            sections.sort(key=lambda x: sum(x.section_fc))
+            sections.sort(key=lambda x: sum(map(lambda x_y: x_y[0]*x_y[1], zip(x.section_fc, FUZZY_MATCH_COSTS))))
             if land_code.small_section:
-                sections.sort(key=lambda x: sum(x.small_section_fc))
+                sections.sort(key=lambda x: sum(map(lambda x_y: x_y[0]*x_y[1], zip(x.small_section_fc, FUZZY_MATCH_COSTS))))
         elif land_code.small_section:
             for town in towns:
                 for section in town.sections:
                     section.count_small_section_fuzzy(land_code.small_section)
                     sections.append(section)
-            sections.sort(key=lambda x: sum(x.small_section_fc))
+            sections.sort(key=lambda x: sum(map(lambda x_y: x_y[0]*x_y[1], zip(x.small_section_fc, FUZZY_MATCH_COSTS))))
 
         number = ''
         if land_code.number:
@@ -198,6 +216,9 @@ class Directory(object):
             if len(numbers) == 1:
                 numbers.append('')
             number = numbers[0].zfill(4) + numbers[1].zfill(4)
+
+        for s in sections[:take]:
+            print(s.section_name + s.small_section_name, s.code6)
 
         return json.dumps([section.__repr__(number) for section in sections[:take]])
 
