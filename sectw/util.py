@@ -17,7 +17,7 @@ class Address(object):
             (?P<value>..+?)
         )
         (?:
-            (?P<unit>[縣市鄉鎮市區段]|地段)
+            (?P<unit>區段|[縣市鄉鎮市區村里段號]|地號|地段)
         )
     ''', re.X)
 
@@ -26,7 +26,7 @@ class Address(object):
             (?P<value>.+?)
         )
         (?:
-            (?P<unit>號|地號|小段)
+            (?P<unit>小段|地號|號)
         )
     ''', re.X)
 
@@ -85,15 +85,24 @@ class Address(object):
     @staticmethod
     def tokenize(addr_str):
         addr_str = Address.normalize(addr_str)
-        # split 松山區西松段一小段 to ['松山區西松段', '一小段'] and fit to different pattern
-        addr_list = list(filter(None, re.split('(段)', addr_str, 1)))
-        addr_list[:2] = [''.join(addr_list[:2])]
+        addr_list = Address.split(addr_str)
         tokens = []
         if len(addr_list) > 0:
+            # make exception if 段 unit only has one character
+            if len(addr_list[0]) == 2:
+                token = (addr_list[0][0], '段')
+                tokens.append(token)
             tokens += Address.TOKEN_RE.findall(Address.normalize(addr_list[0]))
         if len(addr_list) > 1:
             tokens += Address.S_TOKEN_RE.findall(Address.normalize(addr_list[1]))
         return tokens
+
+    @staticmethod
+    def split(addr_str):
+        # split 松山區西松段一小段 to ['松山區西松段', '一小段'] and fit to different pattern
+        addr_list = list(filter(None, re.split('(段)', addr_str, 1)))
+        addr_list[:2] = [''.join(addr_list[:2])]
+        return addr_list
 
     def __init__(self, addr_str):
         self.tokens = Address.tokenize(addr_str)
@@ -119,30 +128,35 @@ class LandCode(Address):
 
     COUNTY_MATCH = ['縣', '市']
     TOWN_MATCH = ['鄉', '鎮', '區']
-    SECTION_MATCH = ['段', '地段']
+    SECTION_MATCH = ['段', '地段', '區段']
     SMALL_SECTION_MATCH = ['小段']
     NUMBER_MATCH = ['號', '地號']
 
-    def __init__(self, address_str):
-        Address.__init__(self, address_str)
+    def __init__(self, addr_str):
+        super(LandCode, self).__init__(addr_str)
         self.county, self.town, self.section, self.small_section, self.number = LandCode.get_value(self.tokens)
 
     @staticmethod
     def get_value(tokens):
         county = LandCode.get_first_value([token[Address.VALUE] + token[Address.UNIT]
-                                           for token in tokens if token[Address.UNIT] in LandCode.COUNTY_MATCH])
+                                           for token in tokens if token[Address.UNIT]
+                                           in LandCode.COUNTY_MATCH])
 
         town = LandCode.get_first_value([token[Address.VALUE] + token[Address.UNIT]
-                                         for token in tokens if token[Address.UNIT] in LandCode.TOWN_MATCH])
+                                         for token in tokens if token[Address.UNIT]
+                                         in LandCode.TOWN_MATCH])
 
         section = LandCode.get_first_value([token[Address.VALUE] + token[Address.UNIT]
-                                           for token in tokens if token[Address.UNIT] in LandCode.SECTION_MATCH])
+                                           for token in tokens if token[Address.UNIT]
+                                            in LandCode.SECTION_MATCH])
 
         small_section = LandCode.get_first_value([token[Address.VALUE] + token[Address.UNIT]
-                                             for token in tokens if token[Address.UNIT] in LandCode.SMALL_SECTION_MATCH])
+                                                  for token in tokens if token[Address.UNIT]
+                                                  in LandCode.SMALL_SECTION_MATCH])
 
         number = LandCode.get_first_value([token[Address.VALUE]
-                                           for token in tokens if token[Address.UNIT] in LandCode.NUMBER_MATCH])
+                                           for token in tokens if token[Address.UNIT]
+                                           in LandCode.NUMBER_MATCH])
 
         return county, town, section, small_section, number
 
@@ -216,9 +230,6 @@ class Directory(object):
             if len(numbers) == 1:
                 numbers.append('')
             number = numbers[0].zfill(4) + numbers[1].zfill(4)
-
-        for s in sections[:take]:
-            print(s.section_name + s.small_section_name, s.code6)
 
         return json.dumps([section.__repr__(number) for section in sections[:take]])
 

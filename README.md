@@ -20,7 +20,7 @@ Take top 3 result:
 
 Manually build a new version:
 
-    $ python -m sextw.builder
+    $ python -m sectw.builder
 
 If you want to create database
 -------------------------------

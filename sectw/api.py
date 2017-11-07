@@ -59,13 +59,13 @@ def list_section(county_code, town_code):
         for child in tree.iterfind('sectItem'):
             code = child.findtext('sectcode')
             name = child.findtext('sectstr')
-            land_code = LandCode(name)
+            name_list = LandCode.split(name)
             office = child.findtext('office')
             code6 = office + code
             code7 = town_code + code
             section = Section(code=code,
-                              section_name=land_code.section,
-                              small_section_name=land_code.small_section,
+                              section_name=name_list[0] if len(name_list) > 0 else name,
+                              small_section_name=name_list[1] if len(name_list) > 1 else '',
                               office=office,
                               code6=code6,
                               code7=code7)

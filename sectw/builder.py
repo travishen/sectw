@@ -4,7 +4,7 @@ from __future__ import print_function
 import sys
 import logging
 import argparse
-from . import api, _package_root
+from . import api
 from .database import model, config
 import json
 import datetime
