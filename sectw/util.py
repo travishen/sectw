@@ -33,24 +33,36 @@ class Address(object):
     VALUE = 0
     UNIT = 1
 
-    TO_REPLACE_RE = re.compile('''
-        [ 　，台、；.之]
+    GLOBAL_REPLACE_RE = re.compile('''
+        [ 　,.，、；台]
         |
-        [０-９]
-        |
-        [一二三四五六七八九]?
-        十?
-        [一二三四五六七八九]
-        (?=[號]|地號)
+        [０-９]    
+    ''', re.X)
+
+    NO_HYPHEN_REPLACE_RE = re.compile('''
+        [之–—]
+    ''', re.X)
+
+    NO_NUM_REPLACE_RE = re.compile('''
+        (?:
+            [一二三四五六七八九]?
+            [一二三四五六七八九]?
+            十?
+            [一二三四五六七八九]
+            |
+            [十]
+        )
+        (?=-|號|地號)
     ''', re.X)
 
     # the strs matched but not in here will be removed
     TO_REPLACE_MAP = {
-        '之': '-', '台': '臺',
+        '之': '-', '–': '-', '—': '-',
+        '台': '臺',
         '１': '1', '２': '2', '３': '3', '４': '4', '５': '5',
         '６': '6', '７': '7', '８': '8', '９': '9', '０': '0',
         '一': '1', '二': '2', '三': '3', '四': '4', '五': '5',
-        '六': '6', '七': '7', '八': '8', '九': '9',
+        '六': '6', '七': '7', '八': '8', '九': '9', '十': '10',
     }
 
     CHINESE_NUMERALS_SET = set('一二三四五六七八九十')
@@ -68,37 +80,61 @@ class Address(object):
             if found in Address.TO_REPLACE_MAP:
                 return Address.TO_REPLACE_MAP[found]
 
-            # for '十一' to '九十九'
+            return ''
+
+        def replace_num(m):
+
+            found = m.group()
+
+            if found in Address.TO_REPLACE_MAP:
+                return Address.TO_REPLACE_MAP[found]
+
             if found[0] in Address.CHINESE_NUMERALS_SET:
-                len_found = len(found)
-                if len_found == 2:
-                    return '1' + Address.TO_REPLACE_MAP[found[1]]
-                if len_found == 3:
-                    return Address.TO_REPLACE_MAP[found[0]] + Address.TO_REPLACE_MAP[found[2]]
+                # for '十一' to '九十九'
+                if u'十' in found[0]:
+                    len_found = len(found)
+                    if len_found == 2:
+                        return '1' + Address.TO_REPLACE_MAP[found[1]]
+                    if len_found == 3:
+                        return Address.TO_REPLACE_MAP[found[0]] + Address.TO_REPLACE_MAP[found[2]]
+                else:
+                    return ''.join(Address.TO_REPLACE_MAP[t] for t in found)
 
             return ''
 
-        s = Address.TO_REPLACE_RE.sub(replace, s)
+        s = Address.GLOBAL_REPLACE_RE.sub(replace, s)
+
+        s = Address.NO_HYPHEN_REPLACE_RE.sub(replace, s)
+
+        while True:
+            replaced = Address.NO_NUM_REPLACE_RE.sub(replace_num, s)
+            if s == replaced:
+                break
+            s = replaced
 
         return s
 
     @staticmethod
     def tokenize(addr_str):
+
         addr_str = Address.normalize(addr_str)
         addr_list = Address.split(addr_str)
         tokens = []
+
         if len(addr_list) > 0:
             # make exception if 段 unit only has one character
             if len(addr_list[0]) == 2:
                 token = (addr_list[0][0], '段')
                 tokens.append(token)
             tokens += Address.TOKEN_RE.findall(Address.normalize(addr_list[0]))
+
         if len(addr_list) > 1:
             tokens += Address.S_TOKEN_RE.findall(Address.normalize(addr_list[1]))
         return tokens
 
     @staticmethod
     def split(addr_str):
+
         # split 松山區西松段一小段 to ['松山區西松段', '一小段'] and fit to different pattern
         addr_list = list(filter(None, re.split('(段)', addr_str, 1)))
         addr_list[:2] = [''.join(addr_list[:2])]
@@ -121,6 +157,7 @@ class Address(object):
 
 
 class LandCode(Address):
+
     COUNTY = 0
     TOWN = 1
     SECTOR = 2
@@ -138,30 +175,30 @@ class LandCode(Address):
 
     @staticmethod
     def get_value(tokens):
-        county = LandCode.get_first_value([token[Address.VALUE] + token[Address.UNIT]
+        county = LandCode.get_first_match([token[Address.VALUE] + token[Address.UNIT]
                                            for token in tokens if token[Address.UNIT]
                                            in LandCode.COUNTY_MATCH])
 
-        town = LandCode.get_first_value([token[Address.VALUE] + token[Address.UNIT]
+        town = LandCode.get_first_match([token[Address.VALUE] + token[Address.UNIT]
                                          for token in tokens if token[Address.UNIT]
                                          in LandCode.TOWN_MATCH])
 
-        section = LandCode.get_first_value([token[Address.VALUE] + token[Address.UNIT]
-                                           for token in tokens if token[Address.UNIT]
+        section = LandCode.get_first_match([token[Address.VALUE] + token[Address.UNIT]
+                                            for token in tokens if token[Address.UNIT]
                                             in LandCode.SECTION_MATCH])
 
-        small_section = LandCode.get_first_value([token[Address.VALUE] + token[Address.UNIT]
+        small_section = LandCode.get_first_match([token[Address.VALUE] + token[Address.UNIT]
                                                   for token in tokens if token[Address.UNIT]
                                                   in LandCode.SMALL_SECTION_MATCH])
 
-        number = LandCode.get_first_value([token[Address.VALUE]
+        number = LandCode.get_first_match([token[Address.VALUE]
                                            for token in tokens if token[Address.UNIT]
                                            in LandCode.NUMBER_MATCH])
 
         return county, town, section, small_section, number
 
     @staticmethod
-    def get_first_value(lst):
+    def get_first_match(lst):
         return next(iter(lst or []), '')
 
 
@@ -188,6 +225,9 @@ class Directory(object):
 
     def find(self, addr_str, take=1):
 
+        # state the costs of each type of error for fuzzy_counts sorting
+        FUZZY_MATCH_COSTS = (3, 1, 1)
+
         land_code = LandCode(addr_str)
 
         if land_code.county:
@@ -202,9 +242,6 @@ class Directory(object):
         else:
             for county in counties:
                 towns += county.towns
-
-        # state the costs of each type of error for fuzzy_counts sorting
-        FUZZY_MATCH_COSTS = (3, 1, 1)
 
         sections = []
         if land_code.section:
