@@ -6,7 +6,7 @@ import datetime
 from xml.etree import ElementTree
 from .util import LandCode
 from .database.model import Version, County, Town, Section
-
+import logging
 
 def collect():
     print('collecting...')
@@ -59,7 +59,7 @@ def list_section(county_code, town_code):
         for child in tree.iterfind('sectItem'):
             code = child.findtext('sectcode')
             name = child.findtext('sectstr')
-            name_list = LandCode.split(name)
+            name_list = LandCode.split_by_section(name)
             office = child.findtext('office')
             code6 = office + code
             code7 = town_code + code

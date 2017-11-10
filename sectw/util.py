@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Address function modified from mosky's zipcodetw module
+
 from __future__ import print_function
 from __future__ import unicode_literals
 import re
@@ -14,27 +14,18 @@ from .database import config
 class Address(object):
     TOKEN_RE = re.compile('''
         (?:
-            (?P<value>..+?)
-        )
-        (?:
-            (?P<unit>區段|[縣市鄉鎮市區村里段號]|地號|地段)
-        )
-    ''', re.X)
-
-    S_TOKEN_RE = re.compile('''
-        (?:
             (?P<value>.+?)
         )
         (?:
-            (?P<unit>小段|地號|號)
+            (?P<unit>地號|地段|小段|區段|鎮段|鎮區|市區|[縣市鄉鎮市區段號])
         )
     ''', re.X)
 
     VALUE = 0
     UNIT = 1
-
+    
     GLOBAL_REPLACE_RE = re.compile('''
-        [ 　,.，、；台]
+        [ 　台]
         |
         [０-９]    
     ''', re.X)
@@ -49,10 +40,8 @@ class Address(object):
             [一二三四五六七八九]?
             十?
             [一二三四五六七八九]
-            |
-            [十]
         )
-        (?=-|號|地號)
+        (?=-|號|地號|$)
     ''', re.X)
 
     # the strs matched but not in here will be removed
@@ -62,10 +51,10 @@ class Address(object):
         '１': '1', '２': '2', '３': '3', '４': '4', '５': '5',
         '６': '6', '７': '7', '８': '8', '９': '9', '０': '0',
         '一': '1', '二': '2', '三': '3', '四': '4', '五': '5',
-        '六': '6', '七': '7', '八': '8', '九': '9', '十': '10',
+        '六': '6', '七': '7', '八': '8', '九': '9',
     }
 
-    CHINESE_NUMERALS_SET = set('一二三四五六七八九十')
+    CHINESE_NUMERALS_SET = set('一二三四五六七八九')
 
     @staticmethod
     def normalize(s):
@@ -91,14 +80,11 @@ class Address(object):
 
             if found[0] in Address.CHINESE_NUMERALS_SET:
                 # for '十一' to '九十九'
-                if u'十' in found[0]:
-                    len_found = len(found)
-                    if len_found == 2:
-                        return '1' + Address.TO_REPLACE_MAP[found[1]]
-                    if len_found == 3:
-                        return Address.TO_REPLACE_MAP[found[0]] + Address.TO_REPLACE_MAP[found[2]]
-                else:
-                    return ''.join(Address.TO_REPLACE_MAP[t] for t in found)
+                len_found = len(found)
+                if len_found == 2:
+                    return '1' + Address.TO_REPLACE_MAP[found[1]]
+                if len_found == 3:
+                    return Address.TO_REPLACE_MAP[found[0]] + Address.TO_REPLACE_MAP[found[2]]
 
             return ''
 
@@ -115,10 +101,91 @@ class Address(object):
         return s
 
     @staticmethod
-    def tokenize(addr_str):
+    def tokenize(addr_str, normalize=True):
+        if normalize:
+            addr_str = Address.normalize(addr_str)
+        return Address.TOKEN_RE.findall(addr_str)    
 
-        addr_str = Address.normalize(addr_str)
-        addr_list = Address.split(addr_str)
+    def __init__(self, addr_str, normalize=True):
+        self.tokens = Address.tokenize(addr_str, normalize)
+
+    def __len__(self):
+        return len(self.tokens)
+
+    @staticmethod
+    def flat(tokens, sarg=None, *sargs):
+        return ''.join(''.join(token) for token in tokens[slice(sarg, *sargs)])
+
+    def pick_to_flat(self, *idxs):
+        return ''.join(''.join(self.tokens[idx]) for idx in idxs)
+
+    def __repr__(self):
+        return 'Address(%r)' % Address.flat(self.tokens)
+
+
+class LandCode(Address):
+
+    COUNTY_DIGIT = 0
+    TOWN_DIGIT = 1
+    SECTION_DIGIT = 2
+    SMALL_SECTION_DIGIT = 3
+    NUMBER_DIGIT = 4
+
+    COUNTY_MATCH = ['縣', '市']
+    TOWN_MATCH = ['鄉', '鎮', '區', '市區', '鎮區']
+    SECTION_MATCH = ['段', '地段', '區段', '鎮段']
+    SMALL_SECTION_MATCH = ['小段']
+    NUMBER_MATCH = ['號', '地號']
+
+    TOKEN_RE = re.compile('''
+        (?:
+            (?P<value>..+?)
+        )
+        (?:
+            (?P<unit>區段|[縣市鄉鎮市區村里段號]|地號|地段)
+        )
+    ''', re.X)
+
+    S_TOKEN_RE = re.compile('''
+        (?:
+            (?P<value>.+?)
+        )
+        (?:
+            (?P<unit>小段|地號|號)
+        )
+    ''', re.X)
+
+    SEP_SIGN = ','
+
+    @staticmethod
+    def get_value(tokens, units):
+
+        def get_first_match(lst):
+            return next(iter(lst or []), ('', ''))
+
+        def get_all_matches(ts, us):
+            return [(t[Address.VALUE], t[Address.UNIT]) for t in ts if t[Address.UNIT] in us]
+
+        all_matches = get_all_matches(tokens, units)
+
+        return get_first_match(all_matches)
+
+    def __init__(self, addr_str, normalize=False, single=False):
+        if single:
+            self.tokens = self.singular_tokenize(addr_str, normalize)
+        else:
+            super(LandCode, self).__init__(addr_str, normalize)
+        self.county = LandCode.get_value(self.tokens, LandCode.COUNTY_MATCH)
+        self.town = LandCode.get_value(self.tokens, LandCode.TOWN_MATCH)
+        self.section = LandCode.get_value(self.tokens, LandCode.SECTION_MATCH)
+        self.small_section = LandCode.get_value(self.tokens, LandCode.SMALL_SECTION_MATCH)
+        self.number = LandCode.get_value(self.tokens, LandCode.NUMBER_MATCH)
+
+    @staticmethod
+    def singular_tokenize(addr_str, normalize):
+        if normalize:
+            addr_str = Address.normalize(addr_str)
+        addr_list = LandCode.split_by_section(addr_str)
         tokens = []
 
         if len(addr_list) > 0:
@@ -126,80 +193,82 @@ class Address(object):
             if len(addr_list[0]) == 2:
                 token = (addr_list[0][0], '段')
                 tokens.append(token)
-            tokens += Address.TOKEN_RE.findall(Address.normalize(addr_list[0]))
+            tokens += LandCode.TOKEN_RE.findall(Address.normalize(addr_list[0]))
 
         if len(addr_list) > 1:
-            tokens += Address.S_TOKEN_RE.findall(Address.normalize(addr_list[1]))
+            tokens += LandCode.S_TOKEN_RE.findall(Address.normalize(addr_list[1]))
+
         return tokens
 
     @staticmethod
-    def split(addr_str):
-
+    def split_by_section(addr_str):
         # split 松山區西松段一小段 to ['松山區西松段', '一小段'] and fit to different pattern
         addr_list = list(filter(None, re.split('(段)', addr_str, 1)))
         addr_list[:2] = [''.join(addr_list[:2])]
         return addr_list
 
-    def __init__(self, addr_str):
-        self.tokens = Address.tokenize(addr_str)
+    @staticmethod
+    def singularize_address(tokens):
+        
+        def flag(ts):
+            flags = []
+            for i, t in enumerate(ts):
+                try:
+                    cut_here = LandCode.get_digit(t[1]) - LandCode.get_digit(ts[i + 1][1]) > 0
+                    flags.append(cut_here)
+                except IndexError:
+                    flags.append(True)
 
-    def __len__(self):
-        return len(self.tokens)
+            return [ts[i] + (f, ) for i, f in enumerate(flags)]
+        
+        def pre_flat(ts):
+            results = []
+            fr = 0
+            for i, t in enumerate(ts):
+                to = i + 1
+                if t[2]:
+                    results.append((fr, to))
+                    fr = to
+            return results
 
-    def flat(self, sarg=None, *sargs):
-        return ''.join(''.join(token) for token in self.tokens[slice(sarg, *sargs)])
+        flagged_tokens = flag(tokens)
+        to_flat = pre_flat(flagged_tokens)
 
-    def pick_to_flat(self, *idxs):
-        return ''.join(''.join(self.tokens[idx]) for idx in idxs)
-
-    def __repr__(self):
-        return 'Address(%r)' % self.flat()
-
-
-class LandCode(Address):
-
-    COUNTY = 0
-    TOWN = 1
-    SECTOR = 2
-    NUMBER = 4
-
-    COUNTY_MATCH = ['縣', '市']
-    TOWN_MATCH = ['鄉', '鎮', '區']
-    SECTION_MATCH = ['段', '地段', '區段']
-    SMALL_SECTION_MATCH = ['小段']
-    NUMBER_MATCH = ['號', '地號']
-
-    def __init__(self, addr_str):
-        super(LandCode, self).__init__(addr_str)
-        self.county, self.town, self.section, self.small_section, self.number = LandCode.get_value(self.tokens)
+        return [Address.flat(tokens, fr, to) for fr, to in to_flat]
 
     @staticmethod
-    def get_value(tokens):
-        county = LandCode.get_first_match([token[Address.VALUE] + token[Address.UNIT]
-                                           for token in tokens if token[Address.UNIT]
-                                           in LandCode.COUNTY_MATCH])
-
-        town = LandCode.get_first_match([token[Address.VALUE] + token[Address.UNIT]
-                                         for token in tokens if token[Address.UNIT]
-                                         in LandCode.TOWN_MATCH])
-
-        section = LandCode.get_first_match([token[Address.VALUE] + token[Address.UNIT]
-                                            for token in tokens if token[Address.UNIT]
-                                            in LandCode.SECTION_MATCH])
-
-        small_section = LandCode.get_first_match([token[Address.VALUE] + token[Address.UNIT]
-                                                  for token in tokens if token[Address.UNIT]
-                                                  in LandCode.SMALL_SECTION_MATCH])
-
-        number = LandCode.get_first_match([token[Address.VALUE]
-                                           for token in tokens if token[Address.UNIT]
-                                           in LandCode.NUMBER_MATCH])
-
-        return county, town, section, small_section, number
+    def flat_token(token):
+        return token[0] + token[1]
 
     @staticmethod
-    def get_first_match(lst):
-        return next(iter(lst or []), '')
+    def singularize_number(addr_str):
+
+        f = LandCode.flat_token
+
+        ins = LandCode(addr_str, normalize=False, single=False)
+        print(ins.tokens)
+        if ins.number:
+            value = re.sub(r'[.、；，+及和|以及]', ',', ins.number[0])
+            ns = [n for n in re.split(LandCode.SEP_SIGN, value) if n]
+
+            # clear other unit's value
+            front_str = f(ins.county) + f(ins.town) + f(ins.section) + f(ins.small_section)
+            front_str = ''.join(e for e in front_str if e.isalnum())
+            return [front_str + n + ins.number[1] for n in ns]
+
+        return []
+                        
+    @classmethod        
+    def get_digit(cls, unit):
+        if unit in cls.COUNTY_MATCH:
+            return cls.COUNTY_DIGIT
+        if unit in cls.TOWN_MATCH:
+            return cls.TOWN_DIGIT
+        if unit in cls.SECTION_MATCH:
+            return cls.SECTION_DIGIT
+        if unit in cls.NUMBER_MATCH:
+            return cls.NUMBER_DIGIT
+        return False
 
 
 class Directory(object):
@@ -226,51 +295,80 @@ class Directory(object):
     def find(self, addr_str, take=1):
 
         # state the costs of each type of error for fuzzy_counts sorting
-        FUZZY_MATCH_COSTS = (3, 1, 1)
+        costs = (3, 1, 1)
 
-        land_code = LandCode(addr_str)
+        def sum_cost(fuzzy_counts):
+            return sum(map(lambda x_y: x_y[0]*x_y[1], zip(fuzzy_counts, costs)))
 
-        if land_code.county:
-            counties = self.version.find(land_code.county)
+        land_code = LandCode(addr_str, normalize=True, single=True)
+
+        f = LandCode.flat_token
+
+        county = f(land_code.county)
+        town = f(land_code.town)
+        section = f(land_code.section)
+        small_section = f(land_code.small_section)
+        number = land_code.number
+
+        if county:
+            counties = self.version.find(county)
         else:
             counties = self.version.counties
 
         towns = []
-        if land_code.town:
-            for county in counties:
-                towns += county.find(land_code.town)
+        if town:
+            for c in counties:
+                towns += c.find(town)
         else:
-            for county in counties:
-                towns += county.towns
+            for c in counties:
+                towns += c.towns
 
         sections = []
-        if land_code.section:
-            for town in towns:
-                for section in town.sections:
-                    section.count_section_fuzzy(land_code.section)
-                    if land_code.small_section:
-                        section.count_small_section_fuzzy(land_code.small_section)
-                    sections.append(section)
-            sections.sort(key=lambda x: sum(map(lambda x_y: x_y[0]*x_y[1], zip(x.section_fc, FUZZY_MATCH_COSTS))))
-            if land_code.small_section:
-                sections.sort(key=lambda x: sum(map(lambda x_y: x_y[0]*x_y[1], zip(x.small_section_fc, FUZZY_MATCH_COSTS))))
-        elif land_code.small_section:
-            for town in towns:
-                for section in town.sections:
-                    section.count_small_section_fuzzy(land_code.small_section)
-                    sections.append(section)
-            sections.sort(key=lambda x: sum(map(lambda x_y: x_y[0]*x_y[1], zip(x.small_section_fc, FUZZY_MATCH_COSTS))))
+        if section:
+            for t in towns:
+                for s in t.sections:
+                    s.count_section_fuzzy(section)
+                    if small_section:
+                        s.count_small_section_fuzzy(small_section)
+                    sections.append(s)
 
-        number = ''
-        if land_code.number:
-            numbers = land_code.number.split('-')
-            if len(numbers) == 1:
-                numbers.append('')
-            number = numbers[0].zfill(4) + numbers[1].zfill(4)
+            sections.sort(key=lambda x: sum_cost(x.section_fc))
 
-        return json.dumps([section.__repr__(number) for section in sections[:take]])
+            if small_section:
+                sections.sort(key=lambda x: sum_cost(x.small_section_fc))
 
+        elif small_section:
+            for t in towns:
+                for s in t.sections:
+                    s.count_small_section_fuzzy(small_section)
+                    sections.append(s)
 
+            sections.sort(key=lambda x: sum_cost(x.small_section_fc))
+
+        digit = ''
+        if number[0]:
+            digits = number[0].split('-')
+            if len(digits) == 1:
+                digits.append('')
+            digit = digits[0].zfill(4) + digits[1].zfill(4)
+
+        return json.dumps([s.__repr__(digit) for s in sections[:take]])
+
+    def find_complex(self, addr_str, take=1):
+
+        # separate addresses
+        tokens = Address.tokenize(addr_str, normalize=False)
+
+        addrs = LandCode.singularize_address(tokens)
+
+        parsed_addrs = []
+
+        for addr in addrs:
+            parsed_addrs += LandCode.singularize_number(addr)
+
+        print(parsed_addrs)
+
+        return [self.find(addr, take=take) for addr in parsed_addrs]
 
 
 

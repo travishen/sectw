@@ -6,7 +6,7 @@ from .util import Directory
 
 # paths
 _package_root = dirname(__file__)
-_csv_version = '2017-11-07'
+_csv_version = '2017-11-11'
 _csv_path = join(_package_root, '{}.csv'.format(_csv_version))
 
 # create a instance
@@ -14,4 +14,5 @@ _dir = Directory(_csv_path)
 
 # expose function
 find = _dir.find
+find_complex = _dir.find_complex
 load_db = _dir.load_db
