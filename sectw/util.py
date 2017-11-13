@@ -352,7 +352,7 @@ class Directory(object):
                 digits.append('')
             digit = digits[0].zfill(4) + digits[1].zfill(4)
 
-        return json.dumps([s.__repr__(digit) for s in sections[:take]])
+        return json.dumps([s.get_val(digit) for s in sections[:take]])
 
     def find_complex(self, addr_str, take=1):
 
