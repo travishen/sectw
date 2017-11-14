@@ -278,7 +278,7 @@ class Directory(object):
 
     @staticmethod
     def load_csv(csv_path):
-        with open(csv_path, 'rb') as file:
+        with open(csv_path, 'r') as file:
             return json.load(file, object_hook=hook)
 
     def load_db(self, db_path, create_date=None):
