@@ -242,6 +242,8 @@ class LandCode(Address):
             return cls.VILLAGE_DIGIT
         if unit in cls.SECTION_MATCH:
             return cls.SECTION_DIGIT
+        if unit in cls.SMALL_SECTION_MATCH:
+            return cls.SMALL_SECTION_DIGIT
         if unit in cls.NUMBER_MATCH:
             return cls.NUMBER_DIGIT
         return False
