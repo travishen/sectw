@@ -17,7 +17,7 @@ class Address(object):
             (?P<value>.+?)
         )
         (?:
-            (?P<unit>地號|地段|小段|區段|鎮段|鎮區|市區|[縣市鄉鎮市區段號])
+            (?P<unit>地號|地段|小段|區段|鎮段|鎮區|市區|[縣市鄉鎮市區村里段號])
         )
     ''', re.X)
 
@@ -127,12 +127,14 @@ class LandCode(Address):
 
     COUNTY_DIGIT = 0
     TOWN_DIGIT = 1
-    SECTION_DIGIT = 2
-    SMALL_SECTION_DIGIT = 3
-    NUMBER_DIGIT = 4
+    VILLAGE_DIGIT = 2
+    SECTION_DIGIT = 3
+    SMALL_SECTION_DIGIT = 4
+    NUMBER_DIGIT = 5
 
     COUNTY_MATCH = ['縣', '市']
     TOWN_MATCH = ['鄉', '鎮', '區', '市區', '鎮區']
+    VILLAGE_MATCH = ['村', '里']
     SECTION_MATCH = ['段', '地段', '區段', '鎮段']
     SMALL_SECTION_MATCH = ['小段']
     NUMBER_MATCH = ['號', '地號']
@@ -142,7 +144,7 @@ class LandCode(Address):
             (?P<value>..+?)
         )
         (?:
-            (?P<unit>區段|[縣市鄉鎮市區村里段號]|地號|地段)
+            (?P<unit>[縣市鄉鎮市區村里])
         )
     ''', re.X)
 
@@ -151,7 +153,7 @@ class LandCode(Address):
             (?P<value>.+?)
         )
         (?:
-            (?P<unit>小段|地號|號)
+            (?P<unit>地段|段|小段|地號|號)
         )
     ''', re.X)
 
@@ -171,41 +173,13 @@ class LandCode(Address):
         return get_first_match(all_matches)
 
     def __init__(self, addr_str, normalize=False, single=False):
-        if single:
-            self.tokens = self.singular_tokenize(addr_str, normalize)
-        else:
-            super(LandCode, self).__init__(addr_str, normalize)
+        super(LandCode, self).__init__(addr_str, normalize)
         self.county = LandCode.get_value(self.tokens, LandCode.COUNTY_MATCH)
         self.town = LandCode.get_value(self.tokens, LandCode.TOWN_MATCH)
+        self.village = LandCode.get_value(self.tokens, LandCode.VILLAGE_MATCH)
         self.section = LandCode.get_value(self.tokens, LandCode.SECTION_MATCH)
         self.small_section = LandCode.get_value(self.tokens, LandCode.SMALL_SECTION_MATCH)
         self.number = LandCode.get_value(self.tokens, LandCode.NUMBER_MATCH)
-
-    @staticmethod
-    def singular_tokenize(addr_str, normalize):
-        if normalize:
-            addr_str = Address.normalize(addr_str)
-        addr_list = LandCode.split_by_section(addr_str)
-        tokens = []
-
-        if len(addr_list) > 0:
-            # make exception if 段 unit only has one character
-            if len(addr_list[0]) == 2:
-                token = (addr_list[0][0], '段')
-                tokens.append(token)
-            tokens += LandCode.TOKEN_RE.findall(Address.normalize(addr_list[0]))
-
-        if len(addr_list) > 1:
-            tokens += LandCode.S_TOKEN_RE.findall(Address.normalize(addr_list[1]))
-
-        return tokens
-
-    @staticmethod
-    def split_by_section(addr_str):
-        # split 松山區西松段一小段 to ['松山區西松段', '一小段'] and fit to different pattern
-        addr_list = list(filter(None, re.split('(段)', addr_str, 1)))
-        addr_list[:2] = [''.join(addr_list[:2])]
-        return addr_list
 
     @staticmethod
     def singularize_address(tokens):
@@ -246,13 +220,13 @@ class LandCode(Address):
         f = LandCode.flat_token
 
         ins = LandCode(addr_str, normalize=False, single=False)
-        print(ins.tokens)
+
         if ins.number:
             value = re.sub(r'[.、；，+及和|以及]', ',', ins.number[0])
             ns = [n for n in re.split(LandCode.SEP_SIGN, value) if n]
 
             # clear other unit's value
-            front_str = f(ins.county) + f(ins.town) + f(ins.section) + f(ins.small_section)
+            front_str = f(ins.county) + f(ins.town) + f(ins.village) + f(ins.section) + f(ins.small_section)
             front_str = ''.join(e for e in front_str if e.isalnum())
             return [front_str + n + ins.number[1] for n in ns]
 
@@ -264,6 +238,8 @@ class LandCode(Address):
             return cls.COUNTY_DIGIT
         if unit in cls.TOWN_MATCH:
             return cls.TOWN_DIGIT
+        if unit in cls.VILLAGE_MATCH:
+            return cls.VILLAGE_DIGIT
         if unit in cls.SECTION_MATCH:
             return cls.SECTION_DIGIT
         if unit in cls.NUMBER_MATCH:
@@ -366,9 +342,7 @@ class Directory(object):
         for addr in addrs:
             parsed_addrs += LandCode.singularize_number(addr)
 
-        print(parsed_addrs)
-
-        return [self.find(addr, take=take) for addr in parsed_addrs]
+        return [{'A': Address.normalize(addr), 'R': self.find(addr, take=take)} for addr in parsed_addrs]
 
 
 

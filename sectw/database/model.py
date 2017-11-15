@@ -110,7 +110,6 @@ class Section(Base):
 
     def get_val(self, number=''):
         return {
-            'S': self.section_name + self.small_section_name,
             'SN6': self.code6,
             'SN7': self.code7,
             'SLN14': self.code6 + number if number else None,
