@@ -222,7 +222,7 @@ class LandCode(Address):
         ins = LandCode(addr_str, normalize=False, single=False)
 
         if ins.number:
-            value = re.sub(r'[.、；，+及和|以及]', ',', ins.number[0])
+            value = re.sub(r'[.、；，+]', LandCode.SEP_SIGN, ins.number[0])
             ns = [n for n in re.split(LandCode.SEP_SIGN, value) if n]
 
             # clear other unit's value
