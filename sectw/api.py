@@ -4,9 +4,9 @@ from __future__ import print_function
 import requests
 import datetime
 from xml.etree import ElementTree
-from .util import LandCode
+from .util import Address
 from .database.model import Version, County, Town, Section
-import logging
+
 
 def collect():
     print('collecting...')
@@ -28,8 +28,9 @@ def list_county():
             towns = list_town(code)
             county = County(code=code, name=name, towns=towns)
             counties.append(county)
-    except:
+    except Exception as e:
         print('please verify this url:{}'.format(url))
+        print(e)
     return counties
 
 
@@ -45,8 +46,9 @@ def list_town(county_code):
             sections = list_section(county_code, code)
             town = Town(code=code, name=name, sections=sections)
             towns.append(town)
-    except:
+    except Exception as e:
         print('please verify this url:{}'.format(url))
+        print(e)
     return towns
 
 
@@ -59,17 +61,18 @@ def list_section(county_code, town_code):
         for child in tree.iterfind('sectItem'):
             code = child.findtext('sectcode')
             name = child.findtext('sectstr')
-            name_list = LandCode.split_by_section(name)
+            address = Address(name)
             office = child.findtext('office')
             code6 = office + code
             code7 = town_code + code
             section = Section(code=code,
-                              section_name=name_list[0] if len(name_list) > 0 else name,
-                              small_section_name=name_list[1] if len(name_list) > 1 else '',
+                              section_name=address.pick_to_flat(0) if len(address.tokens) > 0 else name,
+                              small_section_name=address.pick_to_flat(1) if len(address.tokens) > 1 else '',
                               office=office,
                               code6=code6,
                               code7=code7)
             sections.append(section)
-    except:
+    except Exception as e:
         print('please verify this url:{}'.format(url))
+        print(e)
     return sections
