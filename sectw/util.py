@@ -7,6 +7,7 @@ import re
 import json
 import six
 import logging
+from collections import namedtuple
 from .database.model import hook, Version
 from .database import config
 
@@ -123,21 +124,19 @@ class Address(object):
         return 'Address(%r)' % Address.flat(self.tokens)
 
 
-class LandCode(Address):
+LandType = namedtuple('LandType', ['name', 'units', 'digit'])
+_types = (
+    ('county', ['縣', '市']),
+    ('town', ['鄉', '鎮', '區', '市區', '鎮區']),
+    ('village', ['村', '里']),
+    ('section', ['段', '地段', '區段', '鎮段']),
+    ('small_section', ['小段']),
+    ('number', ['號', '地號']),
+)
+_land_types = [LandType(item[0], item[1], i) for i, item in enumerate(_types)]
 
-    COUNTY_DIGIT = 0
-    TOWN_DIGIT = 1
-    VILLAGE_DIGIT = 2
-    SECTION_DIGIT = 3
-    SMALL_SECTION_DIGIT = 4
-    NUMBER_DIGIT = 5
 
-    COUNTY_MATCH = ['縣', '市']
-    TOWN_MATCH = ['鄉', '鎮', '區', '市區', '鎮區']
-    VILLAGE_MATCH = ['村', '里']
-    SECTION_MATCH = ['段', '地段', '區段', '鎮段']
-    SMALL_SECTION_MATCH = ['小段']
-    NUMBER_MATCH = ['號', '地號']
+class LandAddress(Address):
 
     TOKEN_RE = re.compile('''
         (?:
@@ -158,43 +157,39 @@ class LandCode(Address):
     ''', re.X)
 
     SEP_SIGN = ','
+    
+    def __init__(self, addr_str, normalize=False):
+        super(LandAddress, self).__init__(addr_str, normalize)
+        for land_type in _land_types:
+            setattr(self, land_type.name, self.get_match(self.tokens, land_type.units))
+
+    def __repr__(self):
+        return 'LandAddress(%r)' % self.flat()
+
+    def pick_to_flat(self, *digits):
+        return ''.join(''.join(getattr(self, _land_types[d].name)) for d in digits)
 
     @staticmethod
-    def get_value(tokens, units):
-
-        def get_first_match(lst):
-            return next(iter(lst or []), ('', ''))
-
-        def get_all_matches(ts, us):
-            return [(t[Address.VALUE], t[Address.UNIT]) for t in ts if t[Address.UNIT] in us]
-
-        all_matches = get_all_matches(tokens, units)
-
-        return get_first_match(all_matches)
-
-    def __init__(self, addr_str, normalize=False, single=False):
-        super(LandCode, self).__init__(addr_str, normalize)
-        self.county = LandCode.get_value(self.tokens, LandCode.COUNTY_MATCH)
-        self.town = LandCode.get_value(self.tokens, LandCode.TOWN_MATCH)
-        self.village = LandCode.get_value(self.tokens, LandCode.VILLAGE_MATCH)
-        self.section = LandCode.get_value(self.tokens, LandCode.SECTION_MATCH)
-        self.small_section = LandCode.get_value(self.tokens, LandCode.SMALL_SECTION_MATCH)
-        self.number = LandCode.get_value(self.tokens, LandCode.NUMBER_MATCH)
+    def get_digit(unit):
+        for land_type in _land_types:
+            if unit in land_type.units:
+                return land_type.digit
+        return None
 
     @staticmethod
     def singularize_address(tokens):
-        
+
         def flag(ts):
             flags = []
             for i, t in enumerate(ts):
                 try:
-                    cut_here = LandCode.get_digit(t[1]) - LandCode.get_digit(ts[i + 1][1]) > 0
+                    cut_here = LandAddress.get_digit(t[1]) - LandAddress.get_digit(ts[i + 1][1]) > 0
                     flags.append(cut_here)
                 except IndexError:
                     flags.append(True)
 
-            return [ts[i] + (f, ) for i, f in enumerate(flags)]
-        
+            return [ts[i] + (f,) for i, f in enumerate(flags)]
+
         def pre_flat(ts):
             results = []
             fr = 0
@@ -211,42 +206,17 @@ class LandCode(Address):
         return [Address.flat(tokens, fr, to) for fr, to in to_flat]
 
     @staticmethod
-    def flat_token(token):
-        return token[0] + token[1]
+    def get_match(tokens, units):
 
-    @staticmethod
-    def singularize_number(addr_str):
+        def get_first_match(lst):
+            return next(iter(lst or []), ('', ''))
 
-        f = LandCode.flat_token
+        def get_all_matches(ts, us):
+            return [(t[Address.VALUE], t[Address.UNIT]) for t in ts if t[Address.UNIT] in us]
 
-        ins = LandCode(addr_str, normalize=False, single=False)
+        all_matches = get_all_matches(tokens, units)
 
-        if ins.number:
-            value = re.sub(r'[.、；，+及和]|以及', LandCode.SEP_SIGN, ins.number[0])
-            ns = [n for n in re.split(LandCode.SEP_SIGN, value) if n]
-
-            # clear other unit's value
-            front_str = f(ins.county) + f(ins.town) + f(ins.village) + f(ins.section) + f(ins.small_section)
-            front_str = ''.join(e for e in front_str if e.isalnum())
-            return [front_str + n + ins.number[1] for n in ns]
-
-        return []
-                        
-    @classmethod        
-    def get_digit(cls, unit):
-        if unit in cls.COUNTY_MATCH:
-            return cls.COUNTY_DIGIT
-        if unit in cls.TOWN_MATCH:
-            return cls.TOWN_DIGIT
-        if unit in cls.VILLAGE_MATCH:
-            return cls.VILLAGE_DIGIT
-        if unit in cls.SECTION_MATCH:
-            return cls.SECTION_DIGIT
-        if unit in cls.SMALL_SECTION_MATCH:
-            return cls.SMALL_SECTION_DIGIT
-        if unit in cls.NUMBER_MATCH:
-            return cls.NUMBER_DIGIT
-        return False
+        return get_first_match(all_matches)
 
 
 class Directory(object):
@@ -267,8 +237,8 @@ class Directory(object):
                     latest_version = Version.get_latest_version(session)
                     create_date = latest_version.date
                 self.version = Version.get_version(session, create_date)
-        except:
-            logging.exception('message')
+        except Exception as e:
+            logging.exception(e)
 
     def find(self, addr_str, take=1):
 
@@ -278,15 +248,13 @@ class Directory(object):
         def sum_cost(fuzzy_counts):
             return sum(map(lambda x_y: x_y[0]*x_y[1], zip(fuzzy_counts, costs)))
 
-        land_code = LandCode(addr_str, normalize=True, single=True)
+        land_addr = LandAddress(addr_str, normalize=True)
 
-        f = LandCode.flat_token
-
-        county = f(land_code.county)
-        town = f(land_code.town)
-        section = f(land_code.section)
-        small_section = f(land_code.small_section)
-        number = land_code.number
+        county = land_addr.pick_to_flat(0)
+        town = land_addr.pick_to_flat(1)
+        section = land_addr.pick_to_flat(3)
+        small_section = land_addr.pick_to_flat(4)
+        number = land_addr.number
 
         if county:
             counties = self.version.find(county)
@@ -330,21 +298,39 @@ class Directory(object):
                 digits.append('')
             digit = digits[0].zfill(4) + digits[1].zfill(4)
 
-        return [s.get_val(digit) for s in sections[:take]]
+        return [(s.code6,
+                 s.code7,
+                 s.code6 + digit if digit else '',
+                 s.code7 + digit if digit else '') for s in sections[:take]]
 
     def find_complex(self, addr_str, take=1):
+
+        def singularize_number(addr_str):
+
+            ins = LandAddress(addr_str, normalize=False)
+
+            if ins.number:
+                value = re.sub(r'[.、；，+及和]|以及', LandAddress.SEP_SIGN, ins.number[0])
+                ns = [n for n in re.split(LandAddress.SEP_SIGN, value) if n]
+
+                # clear other unit's value
+                front_str = ins.pick_to_flat(0, 1, 2, 3, 4)
+                front_str = ''.join(e for e in front_str if e.isalnum())
+                return [front_str + n + ins.number[1] for n in ns]
+
+            return []
 
         # separate addresses
         tokens = Address.tokenize(addr_str, normalize=False)
 
-        addrs = LandCode.singularize_address(tokens)
+        addresses = LandAddress.singularize_address(tokens)
 
-        parsed_addrs = []
+        parsed_addresses = []
 
-        for addr in addrs:
-            parsed_addrs += LandCode.singularize_number(addr)
+        for address in addresses:
+            parsed_addresses += singularize_number(address)
 
-        return [{'A': Address.normalize(addr), 'R': self.find(addr, take=take)} for addr in parsed_addrs]
+        return [(Address.normalize(address), self.find(address, take=take)) for address in parsed_addresses]
 
 
 

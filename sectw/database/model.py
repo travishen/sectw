@@ -108,13 +108,6 @@ class Section(Base):
     def count_small_section_fuzzy(self, small_section_str):
         self.small_section_fc = regex.fullmatch(r'(?e)(' + small_section_str + '){e}', self.small_section_name).fuzzy_counts
 
-    def get_val(self, number=''):
-        return {
-            'SN6': self.code6,
-            'SN7': self.code7,
-            'SLN14': self.code6 + number if number else None,
-            'SLN15': self.code7 + number if number else None
-        }
 
 
 
