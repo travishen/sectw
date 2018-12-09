@@ -1,0 +1,4 @@
+six==1.11.0
+SQLAlchemy==1.2.10
+regex==2018.7.11
+requests==2.21.0

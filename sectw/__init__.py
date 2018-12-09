@@ -4,6 +4,8 @@ from os.path import dirname, join
 from .database.config import setup_session
 from .util import Directory
 
+__version__ = '18.12.0'
+
 # paths
 _package_root = dirname(__file__)
 _csv_version = '2018-08-14'

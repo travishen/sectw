@@ -1,5 +1,12 @@
+![image](https://travis-ci.org/travishen/sectw.svg?branch=master)
+
 Inspired by: [moskytw/zipcodetw](https://github.com/moskytw/zipcodetw)
 ----
+
+Installation:
+----
+
+    pip install sectw
 
 Source: [國土測繪圖資服務雲](https://maps.nlsc.gov.tw)
 ----

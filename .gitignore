@@ -3,4 +3,9 @@
 .idea
 
 #
-/database/*.pyc
+venv
+
+#
+.pypirc
+*.egg-info
+dist
