@@ -2,18 +2,19 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
-import sys
-import sectw.builder
-from setuptools.command.install import install
+# import sys
+# import sectw.builder
+# from setuptools.command.install import install
 
 
-class sectw_installer(install):
+# class sectw_installer(install):
+#
+#     def run(self):
+#         print('Building newest section data ... ')
+#         sys.stdout.flush()
+#         sectw.builder.build()
+#         install.run(self)
 
-    def run(self):
-        print('Building newest section data ... ')
-        sys.stdout.flush()
-        sectw.builder.build()
-        install.run(self)
 
 import sectw
 from setuptools import setup, find_packages
@@ -23,7 +24,7 @@ setup(
     name='sectw',
     version=sectw.__version__,
     description='Find land section code in Taiwan by address fuzzily.',
-
+    long_description='Find land section code in Taiwan by address fuzzily.',
     author='ssivart',
     url='https://github.com/ssivart/sectw',
     author_email='travishen.tw@gmail.com',
@@ -48,5 +49,5 @@ setup(
     install_requires=['sqlalchemy', 'regex', 'six', 'requests'],
     package_data={'sectw': ['*.csv']},
 
-    cmdclass={'install': sectw_installer},
+    # cmdclass={'install': sectw_installer},
 )

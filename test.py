@@ -3,8 +3,6 @@
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import io
-import six
 import sectw
 from sectw.util import LandAddress
 

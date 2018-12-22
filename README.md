@@ -32,7 +32,7 @@ Handling complex address:
 
     >>import sectw
 
-    >>sectw.find_complex('臺南市六甲區港子頭段540,540-4地號', take=1)
+    >>sectw.find_complex('臺南市六甲區港子頭段540,540-4地號')
     [('臺南市六甲區港子頭段540地號', [('DF4322', 'D174322', 'DF432205400000', 'D17432205400000')]),
      ('臺南市六甲區港子頭段540-4地號', [('DF4322', 'D174322', 'DF432205400004', 'D17432205400004')])]
 
@@ -47,6 +47,7 @@ Handling complex address:
 Manually build a new dataset version:
 
     $ python -m sectw.builder
+
 
 If you want to create database
 -------------------------------
@@ -64,3 +65,9 @@ Load from database
     >> import sectw
     >> sectw.load_db('postgresql+psycopg2://username:password@host/dbname', create_date='2017-11-16')
     >> sectw.find('台北市松山區延吉段一小段18-1號')
+
+To-do
+-------------------------------
+
+* Test api
+* Modify result format

@@ -4,7 +4,7 @@ from os.path import dirname, join
 from .database.config import setup_session
 from .util import Directory
 
-__version__ = '18.12.0'
+__version__ = '18.12.1'
 
 # paths
 _package_root = dirname(__file__)

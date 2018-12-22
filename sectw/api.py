@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from __future__ import print_function
+import logging
 import requests
 import datetime
 from xml.etree import ElementTree
@@ -29,8 +30,8 @@ def list_county():
             county = County(code=code, name=name, towns=towns)
             counties.append(county)
     except Exception as e:
-        print('please verify this url:{}'.format(url))
-        print(e)
+        logging.error('please verify this url:{}'.format(url))
+        logging.exception(e)
     return counties
 
 
@@ -47,8 +48,8 @@ def list_town(county_code):
             town = Town(code=code, name=name, sections=sections)
             towns.append(town)
     except Exception as e:
-        print('please verify this url:{}'.format(url))
-        print(e)
+        logging.error('please verify this url:{}'.format(url))
+        logging.exception(e)
     return towns
 
 
@@ -73,6 +74,6 @@ def list_section(county_code, town_code):
                               code7=code7)
             sections.append(section)
     except Exception as e:
-        print('please verify this url:{}'.format(url))
-        print(e)
+        logging.error('please verify this url:{}'.format(url))
+        logging.exception(e)
     return sections
